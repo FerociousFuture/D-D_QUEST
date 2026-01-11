@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -18,17 +20,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdventureScreen(viewModel: AdventureViewModel = viewModel()) {
+fun AdventureScreen(
+    viewModel: AdventureViewModel,
+    onBack: () -> Unit
+) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(uiState.currentAdventure?.title ?: "Cargando Aventura...") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -70,7 +82,11 @@ fun AdventureScreen(viewModel: AdventureViewModel = viewModel()) {
 @Composable
 fun DialogueView(node: DialogueNode, onOptionSelected: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = node.characterName, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+        Text(
+            text = node.characterName,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
         Spacer(modifier = Modifier.height(8.dp))
         Card(modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -99,7 +115,12 @@ fun DialogueView(node: DialogueNode, onOptionSelected: (String) -> Unit) {
 @Composable
 fun CombatView(node: CombatNode, onVictory: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text("⚔️ ENCUENTRO DE COMBATE ⚔️", style = MaterialTheme.typography.headlineSmall, color = Color.Red, modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text(
+            "⚔️ ENCUENTRO DE COMBATE ⚔️",
+            style = MaterialTheme.typography.headlineSmall,
+            color = Color.Red,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
         Spacer(modifier = Modifier.height(16.dp))
         Text("Ubicación: ${node.locationDescription}", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(16.dp))
@@ -112,7 +133,7 @@ fun CombatView(node: CombatNode, onVictory: (String) -> Unit) {
                     supportingContent = { Text("Tipo: ${enemy.type}") },
                     leadingContent = { Text("💀", fontSize = 24.sp) }
                 )
-                Divider()
+                HorizontalDivider()
             }
         }
 
@@ -136,7 +157,9 @@ fun ExplorationView(node: ExplorationNode, onPathSelected: (String) -> Unit) {
         node.paths.forEach { path ->
             OutlinedButton(
                 onClick = { onPathSelected(path.nextNodeId) },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
             ) {
                 Text(path.description)
             }
@@ -150,19 +173,34 @@ fun SkillView(node: SkillNode, onSuccess: () -> Unit, onFailure: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
     ) {
-        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text("🎲 PRUEBA DE HABILIDAD", style = MaterialTheme.typography.titleLarge)
             Spacer(modifier = Modifier.height(16.dp))
             Text("Prueba: ${node.category}", fontWeight = FontWeight.Bold)
-            Text("Dificultad (DC): ${node.difficultyClass}", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                "Dificultad (DC): ${node.difficultyClass}",
+                style = MaterialTheme.typography.headlineMedium
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(node.context, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(24.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Button(onClick = onSuccess, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button(
+                    onClick = onSuccess,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                ) {
                     Text("Éxito")
                 }
-                Button(onClick = onFailure, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))) {
+                Button(
+                    onClick = onFailure,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
+                ) {
                     Text("Fallo")
                 }
             }
@@ -173,7 +211,11 @@ fun SkillView(node: SkillNode, onSuccess: () -> Unit, onFailure: () -> Unit) {
 @Composable
 fun LootView(node: LootNode, onContinue: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("💎 BOTÍN ENCONTRADO", style = MaterialTheme.typography.headlineSmall, color = Color(0xFFFF9800))
+        Text(
+            "💎 BOTÍN ENCONTRADO",
+            style = MaterialTheme.typography.headlineSmall,
+            color = Color(0xFFFF9800)
+        )
         Spacer(modifier = Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -195,12 +237,19 @@ fun LootView(node: LootNode, onContinue: () -> Unit) {
 
 @Composable
 fun ItemView(node: ItemNode, onContinue: () -> Unit) {
-    // Implementación similar a LootView pero para un objeto único importante
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("OBJETO CLAVE", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(16.dp))
-        Text(node.itemName, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-        Text(node.itemDescription, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
+        Text(
+            node.itemName,
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            node.itemDescription,
+            style = MaterialTheme.typography.bodyMedium,
+            fontStyle = FontStyle.Italic
+        )
         Spacer(modifier = Modifier.height(16.dp))
         Text(node.expositionText, style = MaterialTheme.typography.bodyLarge)
         Spacer(modifier = Modifier.height(32.dp))
