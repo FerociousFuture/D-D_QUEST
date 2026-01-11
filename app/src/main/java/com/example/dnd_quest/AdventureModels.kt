@@ -1,8 +1,11 @@
 package com.example.dnd_quest
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.util.UUID
 
 // La clase principal que contiene toda la información de una aventura
+@Serializable
 data class Adventure(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -14,11 +17,14 @@ data class Adventure(
 )
 
 // Usamos 'sealed class' para permitir diferentes tipos de nodos pero tratarlos como uno solo
+@Serializable
 sealed class StoryNode {
     abstract val id: String
 }
 
 // 1. NODO DE DIÁLOGO
+@Serializable
+@SerialName("dialogue")
 data class DialogueNode(
     override val id: String,
     val characterName: String, // Quién habla
@@ -26,6 +32,7 @@ data class DialogueNode(
     val options: List<DialogueOption>
 ) : StoryNode()
 
+@Serializable
 data class DialogueOption(
     val text: String,
     val nextNodeId: String,
@@ -34,6 +41,8 @@ data class DialogueOption(
 )
 
 // 2. NODO DE COMBATE
+@Serializable
+@SerialName("combat")
 data class CombatNode(
     override val id: String,
     val locationDescription: String,
@@ -41,6 +50,7 @@ data class CombatNode(
     val nextNodeId: String // A dónde vamos después de ganar
 ) : StoryNode()
 
+@Serializable
 data class Enemy(
     val name: String,
     val type: String,
@@ -48,18 +58,23 @@ data class Enemy(
 )
 
 // 3. NODO DE EXPLORACIÓN
+@Serializable
+@SerialName("exploration")
 data class ExplorationNode(
     override val id: String,
     val description: String, // Descripción de la zona
     val paths: List<ExplorationPath>
 ) : StoryNode()
 
+@Serializable
 data class ExplorationPath(
     val description: String, // "Tomar el camino oscuro"
     val nextNodeId: String
 )
 
 // 4. NODO DE HABILIDAD (Skill Check)
+@Serializable
+@SerialName("skill")
 data class SkillNode(
     override val id: String,
     val category: String, // Ej: "Fuerza", "Percepción"
@@ -70,6 +85,8 @@ data class SkillNode(
 ) : StoryNode()
 
 // 5. NODO DE OBJETO (Item)
+@Serializable
+@SerialName("item")
 data class ItemNode(
     override val id: String,
     val itemName: String,
@@ -79,6 +96,8 @@ data class ItemNode(
 ) : StoryNode()
 
 // 6. NODO DE LOOT TABLE
+@Serializable
+@SerialName("loot")
 data class LootNode(
     override val id: String,
     val lootTable: List<String>, // Lista de cosas que pueden salir
