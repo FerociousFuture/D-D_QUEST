@@ -1,17 +1,10 @@
-package com.example.dnd_quest
+package com.example.dnd_quest //
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.dnd_quest.ui.theme.DND_QUESTTheme
+import com.example.dnd_quest.ui.theme.DND_QUESTTheme //
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,29 +12,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DND_QUESTTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                // Aquí es donde llamamos a nuestra pantalla principal
+                // No necesitamos pasarle el ViewModel manualmente,
+                // AdventureScreen ya se encarga de instanciarlo por defecto.
+                AdventureScreen()
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    DND_QUESTTheme {
-        Greeting("Android")
     }
 }
