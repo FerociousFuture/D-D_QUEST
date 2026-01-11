@@ -32,12 +32,19 @@ fun AdventureScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(uiState.currentAdventure?.title ?: "Cargando Aventura...") },
+                title = { Text(uiState.currentAdventure?.title ?: "Cargando...") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver"
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    // BOTÓN PARA ACTIVAR/DESACTIVAR MODO EDITOR
+                    IconButton(onClick = { viewModel.toggleEditorMode() }) {
+                        Text(
+                            text = if (uiState.isEditorMode) "JUGAR" else "EDITAR",
+                            fontWeight = FontWeight.Bold,
+                            color = if (uiState.isEditorMode) Color.Red else Color.Black
                         )
                     }
                 },
@@ -48,36 +55,46 @@ fun AdventureScreen(
             )
         }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            val node = uiState.currentNode
-            if (node != null) {
-                // Decidimos qué pintar dependiendo del tipo de nodo
-                when (node) {
-                    is DialogueNode -> DialogueView(node) { id -> viewModel.navigateToNode(id) }
-                    is CombatNode -> CombatView(node) { id -> viewModel.navigateToNode(id) }
-                    is ExplorationNode -> ExplorationView(node) { id -> viewModel.navigateToNode(id) }
-                    is SkillNode -> SkillView(
-                        node = node,
-                        onSuccess = { viewModel.navigateToNode(node.successNodeId) },
-                        onFailure = { viewModel.navigateToNode(node.failureNodeId) }
-                    )
-                    is LootNode -> LootView(node) { viewModel.navigateToNode(node.nextNodeId) }
-                    is ItemNode -> ItemView(node) { viewModel.navigateToNode(node.nextNodeId) }
+        Column(modifier = Modifier
+            .padding(paddingValues)
+            .fillMaxSize()) {
+
+            // 1. SI ESTAMOS EN MODO EDITOR, MOSTRAMOS EL PANEL DE EDICIÓN ARRIBA
+            // (Asegúrate de haber creado el archivo AdventureEditor.kt con la función NodeEditorPanel)
+            if (uiState.isEditorMode) {
+                NodeEditorPanel(viewModel = viewModel)
+            }
+
+            // 2. MOSTRAMOS LA VISTA DEL JUEGO (PREVISUALIZACIÓN)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val node = uiState.currentNode
+                if (node != null) {
+                    when (node) {
+                        is DialogueNode -> DialogueView(node) { id -> viewModel.navigateToNode(id) }
+                        is CombatNode -> CombatView(node) { id -> viewModel.navigateToNode(id) }
+                        is ExplorationNode -> ExplorationView(node) { id -> viewModel.navigateToNode(id) }
+                        is SkillNode -> SkillView(
+                            node = node,
+                            onSuccess = { viewModel.navigateToNode(node.successNodeId) },
+                            onFailure = { viewModel.navigateToNode(node.failureNodeId) }
+                        )
+                        is LootNode -> LootView(node) { viewModel.navigateToNode(node.nextNodeId) }
+                        is ItemNode -> ItemView(node) { viewModel.navigateToNode(node.nextNodeId) }
+                    }
+                } else {
+                    Text("Fin de la aventura o error.")
                 }
-            } else {
-                Text("Fin de la aventura o error de carga.")
             }
         }
     }
 }
 
-// --- VISTAS ESPECÍFICAS PARA CADA NODO ---
+// --- VISTAS ESPECÍFICAS PARA CADA NODO (Visualización del Jugador) ---
 
 @Composable
 fun DialogueView(node: DialogueNode, onOptionSelected: (String) -> Unit) {
