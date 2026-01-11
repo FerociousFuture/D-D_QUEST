@@ -9,12 +9,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-// Estado de la UI
 data class AdventureUiState(
     val adventureList: List<Adventure> = emptyList(),
     val currentAdventure: Adventure? = null,
     val currentNode: StoryNode? = null,
-    val isEditorMode: Boolean = false // <--- Esto faltaba
+    val editingNode: StoryNode? = null,
+    val isEditorMode: Boolean = false
 )
 
 class AdventureViewModel(application: Application) : AndroidViewModel(application) {
@@ -27,7 +27,13 @@ class AdventureViewModel(application: Application) : AndroidViewModel(applicatio
         refreshAdventureList()
     }
 
-    // --- NAVEGACIÓN Y CARGA ---
+    fun handleBackPress() {
+        val state = _uiState.value
+        when {
+            state.isEditorMode && state.editingNode != null -> clearEditingNode()
+            state.currentAdventure != null -> closeAdventure()
+        }
+    }
 
     fun refreshAdventureList() {
         viewModelScope.launch {
@@ -36,20 +42,49 @@ class AdventureViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun selectAdventure(adventureId: String) {
+    fun selectAdventure(adventureId: String, startInEditor: Boolean = false) {
         val adventure = storage.getAdventure(adventureId)
         if (adventure != null) {
             _uiState.update {
                 it.copy(
                     currentAdventure = adventure,
-                    currentNode = adventure.nodes[adventure.startNodeId]
+                    currentNode = adventure.nodes[adventure.startNodeId],
+                    editingNode = null,
+                    isEditorMode = startInEditor
                 )
             }
         }
     }
 
+    fun createNewAdventure(title: String, description: String) {
+        val startNodeId = UUID.randomUUID().toString()
+        val startNode = DialogueNode(
+            id = startNodeId,
+            characterName = "Narrador",
+            dialogueText = "Inicio de la aventura...",
+            options = emptyList()
+        )
+
+        val newAdventure = Adventure(
+            title = title,
+            description = description,
+            startNodeId = startNodeId,
+            nodes = mapOf(startNodeId to startNode)
+        )
+
+        saveAdventureState(newAdventure)
+        refreshAdventureList()
+        selectAdventure(newAdventure.id, startInEditor = true)
+    }
+
+    // --- BORRAR AVENTURA ---
+    fun deleteAdventure(adventureId: String) {
+        storage.deleteAdventure(adventureId)
+        refreshAdventureList()
+    }
+
     fun closeAdventure() {
-        _uiState.update { it.copy(currentAdventure = null, currentNode = null) }
+        _uiState.update { it.copy(currentAdventure = null, currentNode = null, editingNode = null) }
         refreshAdventureList()
     }
 
@@ -61,114 +96,139 @@ class AdventureViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // --- ¡ESTA ES LA FUNCIÓN QUE FALTABA! ---
     fun toggleEditorMode() {
-        _uiState.update { it.copy(isEditorMode = !it.isEditorMode) }
+        _uiState.update { state ->
+            val newMode = !state.isEditorMode
+            state.copy(
+                isEditorMode = newMode,
+                editingNode = if (newMode) state.currentNode else null
+            )
+        }
     }
 
-    fun createNewAdventure(title: String, description: String) {
-        val startNode = DialogueNode(
-            id = UUID.randomUUID().toString(),
-            characterName = "Narrador",
-            dialogueText = "Inicio de la aventura. ¡Activa el modo editor para cambiar esto!",
-            options = emptyList()
-        )
-
-        val newAdventure = Adventure(
-            title = title,
-            description = description,
-            startNodeId = startNode.id,
-            nodes = mapOf(startNode.id to startNode)
-        )
-        saveAdventureState(newAdventure)
-        selectAdventure(newAdventure.id)
+    fun selectNodeToEdit(nodeId: String) {
+        val adventure = _uiState.value.currentAdventure ?: return
+        val node = adventure.nodes[nodeId]
+        _uiState.update { it.copy(editingNode = node) }
     }
 
-    // --- LÓGICA DE EDICIÓN (LO QUE FALTABA PARA EL EDITOR) ---
+    fun clearEditingNode() {
+        _uiState.update { it.copy(editingNode = null) }
+    }
 
-    // 1. Guardar cambios en el nodo actual (ej: editar texto)
+    fun createNodeAndGetId(type: String): String {
+        val adventure = _uiState.value.currentAdventure ?: return ""
+        val newId = UUID.randomUUID().toString()
+
+        val newNode: StoryNode = when (type) {
+            "Combate" -> CombatNode(newId, "", emptyList(), "", "")
+            "Exploración" -> ExplorationNode(newId, "", emptyList())
+            // SkillNode inicializado con name vacío
+            "Habilidad" -> SkillNode(newId, "", "", 10, "", "", "")
+            "Objeto" -> ItemNode(newId, "", "", "", "")
+            "Loot" -> LootNode(newId, emptyList(), "")
+            else -> DialogueNode(newId, "", "", emptyList())
+        }
+
+        val newNodes = adventure.nodes.toMutableMap()
+        newNodes[newId] = newNode
+
+        val updatedAdventure = adventure.copy(nodes = newNodes)
+        saveAdventureState(updatedAdventure)
+
+        return newId
+    }
+
+    fun createNode(type: String, linkToParent: Boolean) {
+        val parentNode = _uiState.value.editingNode ?: _uiState.value.currentNode
+        val newId = createNodeAndGetId(type)
+
+        if (newId.isNotEmpty()) {
+            if (linkToParent && parentNode != null) {
+                val updatedParent = linkNodeToParent(parentNode, newId, "Nuevo Camino")
+                updateNode(updatedParent)
+            }
+            selectNodeToEdit(newId)
+        }
+    }
+
+    fun deleteNode(nodeId: String) {
+        val adventure = _uiState.value.currentAdventure ?: return
+        if (nodeId == adventure.startNodeId) return
+
+        val newNodes = adventure.nodes.toMutableMap()
+        newNodes.remove(nodeId)
+
+        val updatedAdventure = adventure.copy(nodes = newNodes)
+        saveAdventureState(updatedAdventure)
+        _uiState.update { it.copy(editingNode = null) }
+    }
+
     fun updateNode(updatedNode: StoryNode) {
         val adventure = _uiState.value.currentAdventure ?: return
-
-        // Actualizamos el mapa de nodos
         val newNodes = adventure.nodes.toMutableMap()
         newNodes[updatedNode.id] = updatedNode
 
         val updatedAdventure = adventure.copy(nodes = newNodes)
         saveAdventureState(updatedAdventure)
 
-        // Actualizamos la vista inmediata
-        _uiState.update { it.copy(currentNode = updatedNode) }
+        _uiState.update {
+            it.copy(
+                editingNode = if (it.editingNode?.id == updatedNode.id) updatedNode else it.editingNode,
+                currentNode = if (it.currentNode?.id == updatedNode.id) updatedNode else it.currentNode
+            )
+        }
     }
 
     fun changeNodeType(newTypeString: String) {
-        val currentNode = _uiState.value.currentNode ?: return
-        val adventure = _uiState.value.currentAdventure ?: return
-
-        // Conservamos el ID y tratamos de conservar la siguiente conexión si existe
+        val currentNode = _uiState.value.editingNode ?: return
         val sameId = currentNode.id
-        // Para nodos lineales, intentamos rescatar a dónde iban
+
         val defaultNextId = when(currentNode) {
-            is DialogueNode -> currentNode.options.firstOrNull()?.nextNodeId ?: UUID.randomUUID().toString()
+            is DialogueNode -> currentNode.options.firstOrNull()?.nextNodeId ?: ""
             is CombatNode -> currentNode.nextNodeId
-            is ExplorationNode -> currentNode.paths.firstOrNull()?.nextNodeId ?: UUID.randomUUID().toString()
+            is ExplorationNode -> currentNode.paths.firstOrNull()?.nextNodeId ?: ""
             is LootNode -> currentNode.nextNodeId
             is ItemNode -> currentNode.nextNodeId
-            is SkillNode -> currentNode.successNodeId // Por defecto tomamos el éxito
+            is SkillNode -> currentNode.successNodeId
         }
 
-        // Creamos la nueva instancia según el tipo solicitado
         val newNode: StoryNode = when (newTypeString) {
-            "Combate" -> CombatNode(sameId, "Zona de combate", emptyList(), defaultNextId)
-            "Exploración" -> ExplorationNode(sameId, "Descripción del lugar...", emptyList())
-            "Habilidad" -> SkillNode(sameId, "Fuerza", 10, "Contexto del chequeo", defaultNextId, UUID.randomUUID().toString())
-            "Objeto" -> ItemNode(sameId, "Nombre Objeto", "Descripción", "Texto al encontrarlo", defaultNextId)
+            "Combate" -> CombatNode(sameId, "Zona de combate", emptyList(), defaultNextId, "")
+            "Exploración" -> ExplorationNode(sameId, "Descripción...", emptyList())
+            // SkillNode inicializado con name
+            "Habilidad" -> SkillNode(sameId, "Nueva Prueba", "Fuerza", 10, "Contexto", defaultNextId, UUID.randomUUID().toString())
+            "Objeto" -> ItemNode(sameId, "Objeto", "Desc", "Lore", defaultNextId)
             "Loot" -> LootNode(sameId, emptyList(), defaultNextId)
-            else -> DialogueNode(sameId, "Narrador", "Nuevo diálogo...", emptyList()) // Default a Diálogo
+            else -> DialogueNode(sameId, "Narrador", "...", emptyList())
         }
 
         updateNode(newNode)
     }
 
-    // 2. Agregar un nuevo camino/opción y crear el nodo destino automáticamente
-    fun addPathToCurrentNode(optionText: String) {
-        val adventure = _uiState.value.currentAdventure ?: return
-        val currentNode = _uiState.value.currentNode ?: return
-
-        // Creamos el nodo nuevo (destino)
-        val newNodeId = UUID.randomUUID().toString()
-        val newNode = DialogueNode(
-            id = newNodeId,
-            characterName = "Nuevo Personaje",
-            dialogueText = "Nuevo nodo creado. ¡Edítame!",
-            options = emptyList()
-        )
-
-        // Dependiendo del tipo de nodo actual, lo conectamos diferente
-        val updatedCurrentNode = when (currentNode) {
-            is DialogueNode -> currentNode.copy(
-                options = currentNode.options + DialogueOption(optionText, nextNodeId = newNodeId)
-            )
-            is ExplorationNode -> currentNode.copy(
-                paths = currentNode.paths + ExplorationPath(optionText, nextNodeId = newNodeId)
-            )
-            // En combate y otros, reemplazamos el destino siguiente
-            is CombatNode -> currentNode.copy(nextNodeId = newNodeId)
-            is LootNode -> currentNode.copy(nextNodeId = newNodeId)
-            is ItemNode -> currentNode.copy(nextNodeId = newNodeId)
-            // SkillNode es complejo (tiene 2 salidas), por ahora no lo auto-conectamos aquí
-            else -> currentNode
+    private fun linkNodeToParent(parent: StoryNode, childId: String, text: String): StoryNode {
+        return when (parent) {
+            is DialogueNode -> parent.copy(options = parent.options + DialogueOption(text, childId))
+            is ExplorationNode -> parent.copy(paths = parent.paths + ExplorationPath(text, childId))
+            is CombatNode -> parent.copy(nextNodeId = childId)
+            is LootNode -> parent.copy(nextNodeId = childId)
+            is ItemNode -> parent.copy(nextNodeId = childId)
+            is SkillNode -> parent
         }
+    }
 
-        // Guardamos ambos: el padre actualizado y el hijo nuevo
-        val newNodes = adventure.nodes.toMutableMap()
-        newNodes[updatedCurrentNode.id] = updatedCurrentNode
-        newNodes[newNode.id] = newNode // Agregamos el nuevo al mapa
-
-        val updatedAdventure = adventure.copy(nodes = newNodes)
-        saveAdventureState(updatedAdventure)
-
-        _uiState.update { it.copy(currentNode = updatedCurrentNode) }
+    fun getParentNodes(targetNodeId: String): List<StoryNode> {
+        val adventure = _uiState.value.currentAdventure ?: return emptyList()
+        return adventure.nodes.values.filter { parent ->
+            when (parent) {
+                is DialogueNode -> parent.options.any { it.nextNodeId == targetNodeId }
+                is CombatNode -> parent.nextNodeId == targetNodeId || parent.defeatNodeId == targetNodeId
+                is ExplorationNode -> parent.paths.any { it.nextNodeId == targetNodeId }
+                is LootNode -> parent.nextNodeId == targetNodeId
+                is ItemNode -> parent.nextNodeId == targetNodeId
+                is SkillNode -> parent.successNodeId == targetNodeId || parent.failureNodeId == targetNodeId
+            }
+        }
     }
 
     private fun saveAdventureState(adventure: Adventure) {
